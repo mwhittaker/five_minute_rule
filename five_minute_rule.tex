@@ -1,0 +1,173 @@
+\documentclass[12pt]{article}
+
+\title{The Five-Minute Rule}
+\author{Michael Whittaker}
+\date{}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{color}
+\usepackage{graphicx}
+\usepackage{mathtools}
+\usepackage{soul}
+\usepackage{subcaption}
+
+% https://brand.berkeley.edu/colors/
+\definecolor{berkblue}   {RGB}{4,   30,  66}
+\definecolor{berkgold}   {RGB}{255, 199, 44}
+\definecolor{berkbluealt}{RGB}{79,  117, 139}
+\definecolor{berkgoldalt}{RGB}{209, 144, 0}
+
+\DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+\newcommand{\emf}[1]{\textcolor{berkgoldalt}{#1}}
+\newcommand{\figref}[1]{Figure~\ref{fig:#1}}
+\newcommand{\secref}[1]{Section~\ref{sec:#1}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+  Disk bandwidth costs money. RAM costs money. If I have a piece of memory, does
+  it cost less money to store it on disk or in RAM? Jim Gray, Franco Putzolu,
+  and Goetz Graefe initially answered this question with the \emph{five-minute
+  rule} in 1987~\cite{gray19875} and then again ten~\cite{gray1998five} and
+  twenty~\cite{graefe2007five} years later. In this paper, we explain the
+  five-minute rule in plain English (\secref{therule}) and then use it to make
+  some pretty graphs (\secref{graphs}).
+\end{abstract}
+
+\section{The Five-Minute Rule}\label{sec:therule}
+\newcommand{\pagesize}{\textsc{PageSize}}
+\newcommand{\ramprice}{\textsc{RamPrice}}
+\newcommand{\accessprice}{\textsc{AccessPrice}}
+\newcommand{\memsize}{\textsc{MemSize}}
+\newcommand{\accessperiod}{\textsc{AccessPeriod}}
+
+A disk is a big long piece of \st{spaghetti} memory segmented into pages. The
+disk provides an interface that allows you to read it one page at a time. No
+more, no less. You want to read less than a page? Too bad. You can't. How big
+are the pages? They could be 4096 bytes or 1024 bytes or 42 bytes; it doesn't
+much matter to us. From now on, we'll denote the number of bytes in a page as
+\emf{\pagesize{}} (e.g. 4096, 2048, 42).
+
+When it comes to disks, faster is better. That is, we want our disks to be able
+to read as many pages per second as possible. Unfortunately, speed ain't cheap;
+we'll have to pay for throughput. A disk that can read 100 pages per second
+will cost more than one that can only read 1 page per second. We'll assume each
+page per second of throughput costs some fixed amount \emf{\accessprice} (e.g.
+\$2000).
+
+Like disk, RAM is a big long piece of \st{spaghetti} memory. Unlike disk, RAM
+isn't divided into pages. We can read and write as much or as little data into
+RAM as we'd like. Want to read 4096 bytes from RAM? No problem. How about 2048
+bytes? Fine by me. 42 bytes? Go ahead! Moreover, when it comes to RAM, bigger
+is better. Unfortunately, size ain't cheap; we'll have to pay for every byte of
+RAM. Let's assume that each byte of RAM costs some fixed amount
+\emf{\ramprice{}} (e.g. \$5).
+
+Now imagine we have some object we'd like to store somewhere. Every so often,
+we read the object. For example, maybe the object is some 4 byte integer that
+we read every second. Or, maybe it's a 10 MB movie that we ready every 6 hours.
+Let \emf{\memsize{}} be the size of the object in bytes (e.g. 4, 10485760), and
+let \emf{\accessperiod{}} be the number of seconds between each access (e.g. 1,
+21600).
+
+We can store this object on disk or in RAM. Let's look at how much both of
+these alternatives are going to cost us.
+
+\newcommand{\numpages}{\ceil{\frac{\memsize}{\pagesize}}}
+\begin{itemize}
+  \item \emph{On Disk.}
+    If our object is \memsize{} bytes big and there are \pagesize{} bytes per
+    page, then we'll have to store the object on $\numpages$ pages. If we
+    access the object every \accessperiod{} seconds, then reading the object
+    requires $\frac{\numpages}{\accessperiod}$ pages per second of bandwidth.
+    With each page per second of bandwidth costing \accessprice{} dollars,
+    storing the object on disk is going to cost, in dollars:
+    \[
+      \frac{\numpages}{\accessperiod} \times \accessprice
+    \]
+  \item \emph{In RAM.}
+    Our object is \memsize{} bytes and each byte of RAM costs \ramprice{}
+    dollars, so storing the object in RAM costs, in dollars:
+    \[
+      \ramprice \times \memsize
+    \]
+\end{itemize}
+
+We want to store an object in RAM whenever it's cheaper to do so. That is, when
+\[
+  \frac{\numpages}{\accessperiod} \times \accessprice
+  \geq
+  \ramprice \times \memsize
+\]
+Solving for \accessperiod{}, we get:
+\[
+  \accessperiod
+  \leq
+  \frac{\numpages \times \accessprice}{\ramprice \times \memsize}
+\]
+In words, given a disk with \pagesize{} bytes per page and \accessprice{}
+dollars per page per second of bandwidth, a RAM with \ramprice{} dollars per
+byte, and a memory object that's \memsize{} bytes big, we'll store the object
+in RAM whenever we access it every
+$\frac{\numpages \times \accessprice}{\ramprice \times \memsize}$
+seconds or fewer.
+
+Gray et al. substituted 1987 era values for \pagesize{}, \accessprice{},
+\ramprice{}, and \memsize{} and found \accessperiod to be around five minutes.
+Hence, the five-minute rule.
+
+\section{Some Pretty Graphs}\label{sec:graphs}
+We can use the five-minute rule formula to generate some nice graphs. Letting
+\begin{itemize}
+  \item \pagesize{} = 4 KB,
+  \item \accessprice{} = $\frac{\$2000}{page/second}$, and
+  \item \ramprice{} = $\frac{\$5}{KB}$,
+\end{itemize}
+we can graph the cost of storing objects of various sizes with various access
+periods on disk and in RAM. This is shown in \figref{costs}. The point where
+the disk cost and RAM cost intersect is called the \emph{break even point}. If
+the object is accessed less frequently than the break even point, then it
+should be stored in RAM; otherwise, it should be stored on disk.
+
+Furthermore, given disks and RAMs with various values of \pagesize{},
+\accessprice{}, and \ramprice{}, we can graph the break even point for objects
+of various sizes. This is given in \figref{break-even}.
+
+\begin{figure}
+  \centering
+
+  \newcommand{\costs}[2]{
+    \begin{subfigure}[b]{0.32\textwidth}
+      \centering
+      \includegraphics[width=\textwidth]{costs-#1KB.pdf}
+      \caption{#2}
+      \label{fig:costs-#1}
+    \end{subfigure}%
+  }
+
+  \costs{01}{1 KB}
+  \costs{02}{2 KB}
+  \costs{03}{3 KB}
+
+  \costs{04}{4 KB}
+  \costs{05}{5 KB}
+  \costs{06}{6 KB}
+
+  \costs{07}{7 KB}
+  \costs{08}{8 KB}
+
+  \caption{Disk and RAM costs}
+  \label{fig:costs}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=\textwidth]{break-even.pdf}
+  \caption{Break even points.}
+  \label{fig:break-even}
+\end{figure}
+
+\bibliographystyle{plain}
+\bibliography{bib}
+\end{document}
